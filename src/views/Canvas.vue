@@ -3,17 +3,13 @@
       <canvas id="image" ref="imageCanvasElement" width="2000" height="2000" :style="{ '--image-scale': scale }">
         Canvas disabled
       </canvas>
-      <div id="cursor" ref="cursorElement" :style="{ 
-        '--cursor-x-offset': xOffset,
-        '--cursor-y-offset': yOffset,
-        transform: `scale(${cursorScale}) translate(calc(3.2vh * var(--cursor-x-offset)), calc(3.2vh * var(--cursor-y-offset)))`
-      }">
+      <div id="cursor" ref="cursorElement" >
       </div>
     </div>
     <div id="position" ref="positionElement">
       ({{ x }},{{ y }})
     </div>
-    <div id="timer" ref="timerElement" class="place-mode">
+    <div id="timer" ref="timerElement" class="place-mode" v-on:click="1 > this.timer && this.$refs.placeBarElement.classList.add('focus')">
       <svg xmlns="http://www.w3.org/2000/svg" x="0px" y="0px" width="50" height="50" viewBox="0 0 50 50" style="fill:#1c1b1a">
         <path d="M 25 2 C 12.309295 2 2 12.309295 2 25 C 2 37.690705 12.309295 48 25 48 C 37.690705 48 48 37.690705 48 25 C 48 12.309295 37.690705 2 25 2 z M 25 4 C 36.609824 4 46 13.390176 46 25 C 46 36.609824 36.609824 46 25 46 C 13.390176 46 4 36.609824 4 25 C 4 13.390176 13.390176 4 25 4 z M 24.984375 6.9863281 A 1.0001 1.0001 0 0 0 24 8 L 24 22.173828 A 3 3 0 0 0 22 25 A 3 3 0 0 0 22.294922 26.291016 L 16.292969 32.292969 A 1.0001 1.0001 0 1 0 17.707031 33.707031 L 23.708984 27.705078 A 3 3 0 0 0 25 28 A 3 3 0 0 0 28 25 A 3 3 0 0 0 26 22.175781 L 26 8 A 1.0001 1.0001 0 0 0 24.984375 6.9863281 z">
         </path>
@@ -34,13 +30,13 @@
         {{ zoom }}
       </div>
     </div>
-    <div id="place-bar" ref="placeBarElement">
+    <div id="place-bar" ref="placeBarElement" v-on:mousedown="$event.stopPropagation()" v-on:touchstart.passive="$event.stopPropagation()">
       <div id="colors">
         <div v-for="(color, index) in colors" :key="index" :id="color" class="color" :class="{ focus: activeColor === color }">
         </div>
       </div>
       <div id="place-button-container">
-        <div id="cancel-place" ref="cancelPlaceElement">
+        <div id="cancel-place" ref="cancelPlaceElement" v-on:click="this.$refs.placeBarElement.classList.remove('focus')">
         </div>
         <div id="valid-place" ref="validPlaceElement">
         </div>
@@ -51,8 +47,8 @@
   export default {
     data() {
       return {
-        x: -297.92,
-        y: -83.8648,
+        x: 0,
+        y: 0,
         scale: 0.266237,
         xOffset: 1118,
         yOffset: 314,
@@ -99,45 +95,47 @@
         imageCanvasContext: null,
       }
     },
-    created: function() {
-      this.jscomp = {
-        scope:{},
-        createTemplateTagFirstArg: function(a) {
-          return a.raw = a
-        },
-        createTemplateTagFirstArgWithRaw: function(a, b) {
-          a.raw = b;
-          return a
-        },
-        arrayIteratorImpl: function(a) {
-          var b = 0;
-          return function() {
-            return b < a.length ? { done: !1, value: a[b++] } : { done: !0 }
-          }
-        },
-        arrayIterator: function(a) {
-          return { next: this.arrayIteratorImpl(a) }
-        },
-        makeIterator: function(a) {
-          var b = "undefined" != typeof Symbol && Symbol.iterator && a[Symbol.iterator];
-          return b ? b.call(a) : this.arrayIterator(a)
-        },
-      }
-    },
     mounted(){
-        this.drawingElement = this.$refs.drawingElement.id;
-        this.imageCanvasElement = this.$refs.imageCanvasElement.id;
-        this.cursorElement = this.$refs.cursorElement.id;
-        this.positionElement = this.$refs.positionElement.id;
-        this.timerElement = this.$refs.timerElement.id;
-        this.timeElement = this.$refs.timeElement.id;
-        this.zoomLevelElement = this.$refs.zoomLevelElement.id;
-        this.placeBarElement = this.$refs.placeBarElement.id;
-        this.cancelPlaceElement = this.$refs.cancelPlaceElement.id;
-        this.validPlaceElement = this.$refs.validPlaceElement.id;
         this.colorElements = this.$refs.placeBarElement.getElementsByClassName('color');
         this.imageCanvasContext = this.$refs.imageCanvasElement.getContext('2d');
         this.$refs.imageCanvasElement.imageSmothinEnabled = false;    
+		this.$refs.timerElement.addEventListener('click', this.timerClick);
+    },
+    methods:{
+        clamp(val, min, max) {
+          return Math.min(Math.max(val, min), max);
+        },
+        completeNumber(num) {
+          return (num.toString().length % 2 ? '0' : '') + num;
+        },
+        displayTime() {
+            this.$refs.timeElement.textContent = this.completeNumber(Math.floor(timer / 3600)) + ":" + this.completeNumber(Math.floor(timer / 60 % 60)) + ":" + this.completeNumber(timer % 60)
+        },
+        restTimer() {
+            this.timer = 60;
+            this.$refs.timerElement.classList.remove('place-mode');
+        },
+        timerClick() {
+            if (this.timer < 1) {
+                this.placeBarElement.classList.add('focus')
+            }
+        },
+		timerTick() {
+			this.timer < 1? this.$refs.timerElement.classList.add('place-mode') : this.timer --;
+			this.displayTime();
+		},
+		change_cursor() {
+			this.$refs.cursorElement.style.setProperty("--cursor-x-offset", this.lastPosition.x);
+			this.$refs.cursorElement.style.setProperty("--cursor-y-offset", this.lastPosition.y);
+		},
+		update_position() {
+			var a = this.$refs.imageCanvasElement.getClientRects()[0].height
+			this.canvasOffset.x = this.clamp(0, (1999 - this.lastPosition.x) / 2E3 * a, .9995 * a);
+			this.canvasOffset.y = this.clamp(0, (1999 - this.lastPosition.y) / 2E3 * a, .9995 * a);
+			this.drawingElement.style.transform = "translate(" + (this.canvasOffset.x - a) + "px, " + (this.canvasOffset.y - a) + "px)";
+			this.change_cursor(this.lastPosition.x, this.lastPosition.y)
+		}
+            
     }
   }
   </script>
