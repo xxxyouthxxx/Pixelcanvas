@@ -66,9 +66,37 @@
           'dark-purple', 'purple', 'pale-purple', 'magenta', 'pink', 'light-pink',
           'dark-brown', 'brown', 'beige', 'black', 'dark-gray', 'gray', 'light-gray', 'white'
         ],
+        zoom_level: 1,
+        zoom_levels: [1, 2.5, 5, 7.5, 10, 15, 20, 30, 40, 60],
+        canvasOffset: {
+             x: 0, 
+             y: 0 
+        },
+        lastPosition: {
+          x: 1000,
+          y: 1000
+        },
+        lastScreenPosition: {
+          x: 0,
+          y: 0
+        },
+        lastTouchZoomDistance: 0,
+        timer:60,
+        isPlacing: false,
         activeColor: 'white',
         jscomp:{},
-        
+        drawingElement: null,
+        imageCanvasElement: null,
+        cursorElement: null,
+        positionElement: null,
+        timerElement: null,
+        timeElement: null,
+        zoomLevelElement: null,
+        placeBarElement: null,
+        cancelPlaceElement: null,
+        validPlaceElement: null,
+        colorElements: null,
+        imageCanvasContext: null,
       }
     },
     created: function() {
@@ -95,6 +123,21 @@
           return b ? b.call(a) : this.arrayIterator(a)
         },
       }
+    },
+    mounted(){
+        this.drawingElement = this.$refs.drawingElement.id;
+        this.imageCanvasElement = this.$refs.imageCanvasElement.id;
+        this.cursorElement = this.$refs.cursorElement.id;
+        this.positionElement = this.$refs.positionElement.id;
+        this.timerElement = this.$refs.timerElement.id;
+        this.timeElement = this.$refs.timeElement.id;
+        this.zoomLevelElement = this.$refs.zoomLevelElement.id;
+        this.placeBarElement = this.$refs.placeBarElement.id;
+        this.cancelPlaceElement = this.$refs.cancelPlaceElement.id;
+        this.validPlaceElement = this.$refs.validPlaceElement.id;
+        this.colorElements = this.$refs.placeBarElement.getElementsByClassName('color');
+        this.imageCanvasContext = this.$refs.imageCanvasElement.getContext('2d');
+        this.$refs.imageCanvasElement.imageSmothinEnabled = false;    
     }
   }
   </script>
