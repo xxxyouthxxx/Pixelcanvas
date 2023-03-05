@@ -1,7 +1,7 @@
 <template>
   <div id="maincontent" ref="maincontent">
     <div id="posel" noselect>{{ position }} {{ zoom }}x</div>
-    <div id="place" noselect @click="showPalette" v-bind:class="{'连接中': !'已连接'}">{{ connectMessage }}</div>
+    <div id="place" noselect :click="zoomIn" v-bind:class="{'连接中': !'已连接'}">{{ connectMessage }}</div>
     <canvas id="canvas" ref="canvas" width="0" height="0" noselect></canvas>
     <div id="canvparent1" ref="canvparent1" noselect></div>
     <div id="canvparent2" ref="canvparent2" noselect>
@@ -74,6 +74,7 @@ export default {
       touch2: null,
       touchmoved: 15,
       move: 3,
+      moved:3,
       selX: 0,
       selY: 0,
       canvasCtx: null,
@@ -83,6 +84,8 @@ export default {
       board: null,
       minZoom: null,
       click:false,
+      mx: 0,
+      my: 0,
       anim: null,
       arrowkeyDown:{
         left: false,
@@ -93,41 +96,56 @@ export default {
     }
   },
   mounted() {
-    document.body.ontouchstart = e => {
-      for (let t of e.changeTouches) {
-        if (!this.touch1) this.touch1 = t, this.touchmoved = 15
-        else if (!this.touch2) this.touch2 =t
-        else [this.touch1,this.touch2] = [this.touch2, t]
-      }
-    },
-    document.body.onmousedown = e => {
-      this.move = 3
+	window.addEventListener("wheel", (e) =>{
+      if (e.target != this.$refs.maincontent && !this.$refs.canvparent2.contains(e.target)) return
+      let d = Math.max(this.minZoom / this.z, Math.min(3 ** Math.max(-0.5, Math.min(0.5, e.deltaY * -0.01)),1 / this.z))
+      this.z *= d
+      this.x += this.my * (d - 1) / this.z / 50
+      this.y -= this.mx * (d - 1) / this.z / 50
+      console.log('x:',this.x,'y:', this.y,'zoomLevel:', this.z);
+      this.pos()
+    })
+	window.addEventListener("touchstart", e => {
+        for (let t of e.changeTouches) {
+          if (!this.touch1) this.touch1 = t, this.touchmoved = 15
+          else if (!this.touch2) this.touch2 =t
+          else [this.touch1,this.touch2] = [this.touch2, t]
+        }
+    })
+	window.addEventListener("mousedown", e => {
+		console.log('mousedown');
+		this.move = 3
       this.click = e.button + 1
-    },
-    document.onmouseup = e => {
-      if (e.target != this.$refs.maincontent && this.$refs.canvparent2.contains(e.target))
+    })
+	window.addEventListener("mouseup", e => {
+		console.log('mouseup');
+      if (e.target != this.$refs.maincontent && !this.$refs.canvparent2.contains(e.target))
       return (this.move = 3, this.click = 0)
       if (this.move > 0 && this.$refs.canvparent2.contains(e.target)) {
         this.clicked(e.clientX, e.clientY)
       }
       this.move = 3
       this.click = 0
-    },
-    document.body.onkeyup = e => {
+    })
+	window.addEventListener("keyup", e => {
       let i = 10
       let repeatFunc = setInterval(
         () => {
           switch (e.keyCode) {
             case 37:
+              this.x -= i / 55
               this.arrowkeyDown.left = false
-              break
+              break 
             case 38:
+              this.y -= i / 55
               this.arrowkeyDown.up = false
               break
             case 39:
+              this.x += i / 55
               this.arrowkeyDown.right = false
               break
             case 40:
+              this.y += i / 55
               this.arrowkeyDown.down = false
               break
           }
@@ -135,12 +153,55 @@ export default {
           i--
           if (i <= 0) clearInterval(repeatFunc)
         },16)
-    },
-    oncontextmenu = e => {
-      e.preventDefault()
-    }
-    this.setsize(this.WIDTH, this.HEIGHT)
-
+    })
+	window.addEventListener("mousemove", e => {
+      if (e.target != this.$refs.maincontent && !this.$refs.canvparent2.contains(e.target)) return
+      this.moved --
+      let dx = -(this.mx - (this.mx = e.clientX - innerWidth / 2))
+      let dy = -(this.my - (this.my = e.clientY - this.$refs.maincontent.offsetHeight / 2))
+      if (dx != dx || dy != dy) return
+      if (this.click) {
+        this.x -= dx / (this.z * 50)
+        this.y -= dy / (this.z * 50)
+        this.pos()
+        clearInterval(this.anim)
+      }
+    })
+	window.addEventListener("touchmove", e => {
+		for (let t of e.changedTouches) {
+			clearInterval(this.anim)
+			a: if (!this.touch2 && this.touch1 && this.touch1.identifier == t.identifier) {
+				this.touchmoved -= Math.abs(t.clientY - this.touch1.clientY) + Math.abs(t.clientX - this.touch1.clientX)
+				if (e.target != this.$refs.maincontent && !this.$refs.canvparent2.contains(e.target)) break a
+				this.x -= (t.clientX - this.touch1.clientX) / (this.z * 50)
+				this.y -= (t.clientY - this.touch1.clientY) / (this.z * 50)
+				this.pos()
+			}
+			else if (this.touch1 && this.touch2) {
+				if (e.target != this.$refs.maincontent && !this.$refs.canvparent2.contains(e.target)) break a
+				let touch = this.touch1.identifier == t.identifier ? this.touch1 : (this.touch2.identifier == t.identifier ? this.touch2 : null)
+				if (!touch) break a
+				let other = touch == this.touch1 ? this.touch2 : this.touch1
+				this.x -= (t.clientX - touch.clientX) / (this.z * 50)
+				this.y -= (t.clientY - touch.clientY) / (this.z * 50)
+				this.touchmoved -= Math.abs(t.clientY - touch.clientY) + Math.abs(t.clientX - touch.clientX)
+				let dx = touch.clientX - other.clientX
+				let dy = touch.clientY - other.clientY
+				let a = dx * dx + dy * dy
+				dx = t.clientX - other.clientX
+				dy = t.clientY - other.clientY
+				a = Math.sqrt((dx * dx + dy * dy) / a)
+				this.z *= a
+				this.pos()
+			}
+			if (this.touch1 && this.touch1.identifier == t.identifier) this.touch1 = t
+			else if (this.touch2 && this.touch2.identifier == t.identifier) this.touch2 = t
+		}
+  })
+	oncontextmenu = e => {
+    e.preventDefault()
+  }
+  this.setsize(this.WIDTH, this.HEIGHT)
   },
   methods:{
     setsize(w, h = w) {
@@ -203,17 +264,12 @@ export default {
       this.transform()
     },
     transform() {
-      const { canvas, canvparent1, canvparent2, canvselect } = this.$refs
-      const { x, y, z } = this
-      const { innerWidth, devicePixelRatio } = window
-      const maincontent = this.$refs.maincontent
-
-      canvparent1.style.transform = canvparent2.style.transform = `translate(${x * z * -50 + innerWidth / 2}px, ${y * z * -50 + maincontent.offsetHeight / 2}px) scale(${z * 50})`
-      canvselect.style.transform = `translate(${Math.floor(x)}px, ${Math.floor(y)}px) scale(0.01)`
-      canvas.style.width = `${z * canvas.width * 50}px`
-      canvas.style.height = `${z * canvas.height * 50}px`
-      canvas.style.transform = `translate(${x * z * -50}px, ${y * z * -50}px)`
-      canvas.style.imageRendering = z < 1 / 50 / devicePixelRatio ? 'initial' : ''
+      this.$refs.canvparent1.style.transform = this.$refs.canvparent2.style.transform = `translate(${this.x * this.z * -50 + innerWidth / 2}px, ${this.y * this.z * -50 + this.$refs.maincontent.offsetHeight / 2}px) scale(${this.z * 50})`
+      this.$refs.canvselect.style.transform = `translate(${Math.floor(this.x)}px, ${Math.floor(this.y)}px) scale(0.01)`
+      this.$refs.canvas.style.width = `${this.z * this.$refs.canvas.width * 50}px`
+      this.$refs.canvas.style.height = `${this.z * this.$refs.canvas.height * 50}px`
+      this.$refs.canvas.style.transform = `translate(${this.x * this.z * -50}px, ${this.y * this.z * -50}px)`
+      this.$refs.canvas.style.imageRendering = this.z < 1 / 50 / devicePixelRatio ? 'initial' : ''
     },
     clicked(clientX,clientY) {
       clearInterval(this.anim)
@@ -226,6 +282,23 @@ export default {
         this.showPalette()
         return
       }
+    this.anim = setInterval(() => {
+		this.x += (clientX - this.x) / 10
+		this.y += (clientY - this.y) / 10
+		this.pos()
+		if (Math.abs(clientX - this.x) + Math.abs(clientY - this.y) < 0.1) clearInterval(this.anim)
+      },15)
+    },
+    zoomIn() {
+      console.log('zoomIn', this.z);
+      if (this.z >= 0.4) return
+      clearInterval(this.anim)
+      let dz = 0.005
+      this.anim = setInterval(() => {
+        this.z += dz
+        this.pos()
+        if (this.z >= 0.4) clearInterval(this.anim)
+      }, 15)
     }
 
   }

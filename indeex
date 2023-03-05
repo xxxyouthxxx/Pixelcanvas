@@ -1,0 +1,70 @@
+
+    window.addEventListener("keyup", e => {
+      let i = 10
+      let repeatFunc = setInterval(
+        () => {
+          switch (e.keyCode) {
+            case 37:
+              this.arrowkeyDown.left = false
+              break
+            case 38:
+              this.arrowkeyDown.up = false
+              break
+            case 39:
+              this.arrowkeyDown.right = false
+              break
+            case 40:
+              this.arrowkeyDown.down = false
+              break
+          }
+          this.pos()
+          i--
+          if (i <= 0) clearInterval(repeatFunc)
+        },16)
+    })
+    oncontextmenu = e => {
+    e.preventDefault()
+    }
+    window.addEventListener("mousemove", e => {
+		console.log(this.x, this.y, this.z);
+		console.log(this.$refs.canvparent2.contains(e.target));
+      if (e.target != this.$refs.maincontent && this.$refs.canvparent2.contains(e.target)) return
+      this.moved --
+      let dx = -(this.mx - (this.mx = e.clientX - innerWidth / 2))
+      let dy = -(this.my - (this.my = e.clientY - this.$refs.maincontent.offsetHeight / 2))
+      if (dx != dx || dy != dy) return
+      if (this.click) {
+        this.x -= dx / (this.z * 50)
+        this.y -= dy / (this.z * 50)
+        this.pos()
+        clearInterval(this.anim)
+      }
+    })
+    window.addEventListener("touchmove", e => {
+      for (let t of e.changedTouches) {
+      clearInterval(this.anim)
+      a: if (!this.touch2 && this.touch1.identifier == t.identifier) {
+        this.touchmoved -= Math.abs(t.clientY - this.touch1.clientY) + Math.abs(t.clientX - this.touch1.clientX)
+        if (e.target != this.$refs.maincontent && this.$refs.canvparent2.contains(e.target)) break a
+        this.x -= (t.clientX - this.touch1.clientX) / (this.z * 50)
+        this.y -= (t.clientY - this.touch1.clientY) / (this.z * 50)
+        this.pos()
+      }
+      else if (this.touch1 && this.touch2) {
+        if (e.target != this.$refs.maincontent && this.$refs.canvparent2.contains(e.target)) break a
+        let touch = this.touch1.identifier == t.identifier ? this.touch1 : this.touch2.identifier == t.identifier ? this.touch2 : null
+        if (!touch) break a
+        let other = touch == this.touch1 ? this.touch2 : this.touch1
+        this.x -= (t.clientX - touch.clientX) / (this.z * 50)
+        this.y -= (t.clientY - touch.clientY) / (this.z * 50)
+        this.touchmoved -= Math.abs(t.clientY - touch.clientY) + Math.abs(t.clientX - touch.clientX)
+        let dx = touch.clientX - other.clientX
+        let dy = touch.clientY - other.clientY
+        let a = dx * dx + dy * dy
+        this.z *= a
+        this.pos()
+      }
+      if (this.touch1 && this.touch1.identifier == t.identifier) this.touch1 = t
+      else if (this.touch2 && this.touch2.identifier == t.identifier) this.touch2 = t
+    }
+    })
