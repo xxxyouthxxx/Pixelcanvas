@@ -4,15 +4,9 @@ const routes = [
     {
         path: "/",
         name: "Home",
-        component: () => import("../views/Canvas.vue"),
-    },
-    {
-        path:"/login",
-        name:"login",
-        component: () => import("../views/Login.vue"),
+        component: () => import("../views/index.vue"),
     }
-]
-
+];
 const router = createRouter({
     history: createWebHashHistory(),
     routes,

@@ -1,0 +1,242 @@
+<template>
+    <div id="maincontent" ref="maincontent">
+      <div id="posel" noselect>(0,0) 2.5x</div>
+      <canvas ref="canvas" :width="0" :height="0" noselect></canvas>
+      <div ref="canvparent1" noselect :style="parent1Style">
+      </div>
+      <div ref="canvparent2" noselect :style="parent2Style">
+        <div ref="canvselect" :style="selectStyle">
+          <img src="../assets/svg/pixel-select.svg" style="position: absolute; top: -10%; left: -10%; width: 120%; height: 120%" @dragstart.prevent>
+        </div>
+        <img ref="templateImage" width="auto" height="auto" @drag.prevent>
+      </div>
+      <div id="palette" ></div>
+    </div>
+  </template>
+  <script>
+  export default {
+    data() {
+      return {
+        selX: 0,
+        selY: 0,
+        x: 0,
+        y: 0,
+        z: 0.2,
+        board: [],
+        minZoom: 0,
+        WIDTH: 1000,
+        HEIGHT: 1000,
+        PALETTE: [
+          0xff1a006d, 
+          0xff3900be, 
+          0xff0045ff, 
+          0xff00a8ff, 
+          0xff35d6ff, 
+          0xffb8f8ff, 
+          0xff68a300, 
+          0xff78cc00, 
+          0xff56ed7e, 
+          0xff6f7500, 
+          0xffaa9e00, 
+          0xffc0cc00, 
+          0xffa45024, 
+          0xffea9036, 
+          0xfff4e951, 
+          0xffc13a49, 
+          0xffff5c6a, 
+          0xffffb394, 
+          0xff9f1e81, 
+          0xffc04ab4, 
+          0xffffabe4, 
+          0xff7f10de, 
+          0xff8138ff, 
+          0xffaa99ff, 
+          0xff2f486d, 
+          0xff26699c, 
+          0xff70b4ff, 
+          0xff000000, 
+          0xff525251, 
+          0xff908d89, 
+          0xffd9d7d4, 
+          0xffffffff
+        ],
+        touch1: null,
+        touch2: null,
+        touchmoved: 15,
+        moved: 3,
+        selX: 0,
+        selY: 0,
+        x: 0,
+        y: 0,
+        z: 0,
+        board: [],
+        minZoom: 0,
+        click: false,
+        mx: 0,
+        my: 0,
+        anim: null,
+        arrowkeyDown: {
+          left: false,
+          right: false,
+          up: false,
+          down: false
+        }
+      }
+    },
+    methods: {
+      transform() {
+        this.$refs.canvparent1.style.transform = this.$refs.canvparent2.style.transform = "translate(" + (this.x * this.z * -50 + window.innerWidth / 2) + "px, " + (this.y * this.z * -50 + this.$refs.maincontent.offsetHeight / 2) + "px) scale(" + this.z * 50 + ")"
+        this.$refs.canvselect.style.transform = "translate(" + Math.floor(this.x) + "px, " + Math.floor(this.y) + "px) scale(0.01)"
+        this.$refs.canvas.style.width = this.z * this.$refs.canvas.width * 50 + "px"
+        this.$refs.canvas.style.height = this.z * this.$refs.canvas.height * 50 + "px"
+        this.$refs.canvas.style.transform = "translate(" + this.x * this.z * -50 + "px, " + this.y * this.z * -50 + "px)"
+        this.$refs.canvas.style.imageRendering = this.z < 1 / 50 / devicePixelRatio ? "initial" : ""
+      },
+      setsize(w, h = w) {
+        this.$refs.canvas.width = innerHeight
+        this.$refs.canvas.height = innerHeight
+        this.$refs.canvas.width = this.WIDTH = w
+        this.$refs.canvas.height = this.HEIGHT = h
+        this.$refs.canvparent1.style.width = w + "px"
+        this.$refs.canvparent1.style.height = h + "px"
+        this.$refs.canvparent2.style.width = w + "px"
+        this.$refs.canvparent2.style.height = h + "px"
+        this.board = new Uint8Array(w * h).fill(255)
+        let i = this.board.length
+        this.x = +localStorage.x || this.WIDTH / 2
+        this.y = +localStorage.y || this.HEIGHT / 2
+        this.z = +localStorage.z || 0.2
+        for (let [k, v] of new URLSearchParams(location.search)) {
+          v *= 1
+          if (v != v) continue
+          switch (k) {
+            case 'x':
+              this.x = v;
+              break
+            case 'y':
+              this.y = v;
+              break
+            case 'z':
+              this.z = v;
+              break
+            case 'err':
+              onerror = alert;
+              break
+            case 'debug':
+              break
+          }
+        }
+        this.onresize()
+      },
+      onresize() {
+        this.minZoom = Math.min(window.innerWidth / this.$refs.canvas.width, this.$refs.maincontent.offsetHeight / this.$refs.canvas.height) / 50
+        this.pos()
+      },
+      pos() {
+        if (this.z < this.minZoom) this.z = this.minZoom
+        if (this.z > 1) this.z = 1
+        let right = this.x - this.$refs.canvas.width + 0.01
+        let left = this.x
+        let up = this.y - this.$refs.canvas.height + 0.01
+        let down = this.y
+        if (right >= left) this.x = 0
+        else if (right > 0) this.x -= right
+        else if (left < 0) this.x -= left
+        if (up >= down) this.y = 0
+        else if (up > 0) this.y -= up
+        else if (down < 0) this.y -= down
+        this.transform()
+      },
+      renderAll() {
+        let img = new ImageData(this.$refs.canvas.width, this.$refs.canvas.height)
+        let data = new Uint32Array(img.data.buffer)
+        for (let i = 0; i < this.board.length; i++) {
+          data[i] = this.PALETTE[this.board[i]]
+        }
+        this.$refs.canvas.getContext('2d').putImageData(img, 0, 0)
+        this.$refs.canvas.getContext('2d').getImageData(0, 0, 1, 1)
+      },
+      click(clientX, clientY){
+        clearInterval(this.anim)
+        clientX = Math.floor(this.x + (clientX - innerWidth / 2) / this.z / 50) + 0.5
+        clientY = Math.floor(this.y + (clientY - this.$refs.maincontent.offsetHeight / 2) / this.z / 50) + 0.5
+        if (clientX == Math.floor(this.x) + 0.5 && clientY == Math.floor(this.y) + 0.5) {
+          clientX -= 0.5;
+          clientY -= 0.5
+          if (this.CD < Date.now()) {
+            this.zoomIn()
+            this.showPalette()
+          }
+          return
+        }
+        (this.CD > Date.now() ? this.AUDIOS.invalid : this.AUDIOS.highlight).run()
+        this.anim = setInterval(() => {
+          this.x += (clientX - this.x) / 10
+          this.y += (clientY - this.y) / 10
+          this.pos()
+          if (Math.abs(clientX - this.x) + Math.abs(clientY - this.y) < 0.1) clearInterval(this.anim)
+        }, 15)
+      }
+    },
+    mounted() {
+      document.body.ontouchstart = e => {
+        for (let t of e.changedTouches) {
+          if (!this.touch1) {
+            this.touch1 = t
+            this.touchmoved = 15
+          } else if (!this.touch2) {
+            this.touch2 = t
+          } else {
+            [this.touch1, this.touch2] = [this.touch2, t]
+          }
+        }
+      }
+      document.body.onmousedown = e => {
+        this.moved = 3
+        this.click = e.button + 1
+      }
+      document.onmouseup = e => {
+        if (e.target != this.$refs.maincontent && !this.$refs.canvparent2.contains(e.target))
+            return (this.moved = 3, this.click = 0)
+        if (this.moved > 0 && this.$refs.canvparent2.contains(e.target)) {
+          this.click(e.clientX, e.clientY)
+        }
+        this.moved = 3
+        this.click = 0
+      }
+      document.body.onkeyup = e => {
+        let i = 10
+        let repeatFunc = setInterval(() => {
+          // We use 55 because: 10/55+9/55+8/55+7/55+6/55+5/55+4/55+3/55+2/55+1/55 == 1
+          switch (e.keyCode) {
+            case 37:
+              this.x -= i / 55;
+              this.arrowkeyDown.right = true;
+              break //right
+            case 38:
+              this.y -= i / 55;
+              this.arrowkeyDown.up = true;
+              break //up
+            case 39:
+              this.x += i / 55;
+              this.arrowkeyDown.left = true;
+              break //left
+            case 40:
+              this.y += i / 55;
+              this.arrowkeyDown.down = true;
+              break //down
+          }
+          this.pos()
+          i--
+          if (i <= 0) clearInterval(repeatFunc)
+        }, 16)
+      }
+      
+      this.setsize(this.WIDTH, this.HEIGHT)
+      this.renderAll()
+    },
+    
+}
+</script>
+
+  
