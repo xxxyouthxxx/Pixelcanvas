@@ -1,7 +1,6 @@
 <template>
   <div id="maincontent" ref="maincontent">
     <div id="posel" noselect>{{ position }} {{ zoom }}x</div>
-    <div id="place" noselect :click="zoomIn" v-bind:class="{'连接中': !'已连接'}">{{ connectMessage }}</div>
     <canvas id="canvas" ref="canvas" width="0" height="0" noselect></canvas>
     <div id="canvparent1" ref="canvparent1" noselect></div>
     <div id="canvparent2" ref="canvparent2" noselect>
@@ -10,18 +9,10 @@
       </div>
       <img id="templateImage" ref="templateImage" width="auto" height="auto" draggable="false">
     </div>
-    <div id="palette" :style="{transform: `translateY(100%)`}" noselect>
-      <div id="colors"></div>
-      <div class="buttons">
-        <div class="pcancel" @click="handleCancel">
-          <svg xmlns="http://www.w3.org/2000/svg" data-name="icons final" viewBox="0 0 20 20">
-            <path d="M18.442 2.442l-.884-.884L10 9.116 2.442 1.558l-.884.884L9.116 10l-7.558 7.558.884.884L10 10.884l7.558 7.558.884-.884L10.884 10l7.558-7.558z"></path>
-          </svg>
-        </div>
-        <div id="pok" class="pok" :class="{ enabled: isPaleteOpen }" @click="handleOk">
-          <svg xmlns="http://www.w3.org/2000/svg" data-name="icons final" viewBox="0 0 20 20">
-            <path d="M7.5 15.583a.72.72 0 01-.513-.212L1.558 9.942l.884-.884L7.5 14.116 18.058 3.558l.884.884L8.013 15.371a.72.72 0 01-.513.212z"></path>
-          </svg>
+    <div id="palette" ref="palette" :style="{transform: `translateY(100%)`}" noselect>
+      <div id="colors" ref="colors">
+        <div v-for="(colour, i) in PALETTE" :key="i" :style="'background: rgba(' + (colour & 255) + ',' + ((colour >> 8) & 255) + ',' + ((colour >> 16) & 255) + ', 1)' + (colour == 0xffffffff ? '; outline: 1px #ddd solid; outline-offset: -1px' : '')">
+          <span></span>
         </div>
       </div>
     </div>
@@ -96,15 +87,6 @@ export default {
     }
   },
   mounted() {
-	window.addEventListener("wheel", (e) =>{
-      if (e.target != this.$refs.maincontent && !this.$refs.canvparent2.contains(e.target)) return
-      let d = Math.max(this.minZoom / this.z, Math.min(3 ** Math.max(-0.5, Math.min(0.5, e.deltaY * -0.01)),1 / this.z))
-      this.z *= d
-      this.x += this.my * (d - 1) / this.z / 50
-      this.y -= this.mx * (d - 1) / this.z / 50
-      console.log('x:',this.x,'y:', this.y,'zoomLevel:', this.z);
-      this.pos()
-    })
 	window.addEventListener("touchstart", e => {
         for (let t of e.changeTouches) {
           if (!this.touch1) this.touch1 = t, this.touchmoved = 15
@@ -113,14 +95,14 @@ export default {
         }
     })
 	window.addEventListener("mousedown", e => {
-		console.log('mousedown');
-		this.move = 3
+      console.log('mousedown');
+      this.move = 3
       this.click = e.button + 1
     })
 	window.addEventListener("mouseup", e => {
 		console.log('mouseup');
       if (e.target != this.$refs.maincontent && !this.$refs.canvparent2.contains(e.target))
-      return (this.move = 3, this.click = 0)
+        return (this.move = 3, this.click = 0)
       if (this.move > 0 && this.$refs.canvparent2.contains(e.target)) {
         this.clicked(e.clientX, e.clientY)
       }
@@ -153,7 +135,10 @@ export default {
           i--
           if (i <= 0) clearInterval(repeatFunc)
         },16)
-    })
+  })
+  oncontextmenu = e => {
+    e.preventDefault()
+  }
 	window.addEventListener("mousemove", e => {
       if (e.target != this.$refs.maincontent && !this.$refs.canvparent2.contains(e.target)) return
       this.moved --
@@ -166,7 +151,16 @@ export default {
         this.pos()
         clearInterval(this.anim)
       }
-    })
+  })
+  window.addEventListener("wheel", (e) =>{
+      if (e.target != this.$refs.maincontent && !this.$refs.canvparent2.contains(e.target)) return
+      let d = Math.max(this.minZoom / this.z, Math.min(3 ** Math.max(-0.5, Math.min(0.5, e.deltaY * -0.01)),1 / this.z))
+      this.z *= d
+      this.x += this.my * (d - 1) / this.z / 50
+      this.y -= this.mx * (d - 1) / this.z / 50
+      console.log('x:',this.x,'y:', this.y,'zoomLevel:', this.z);
+      this.pos()
+  })
 	window.addEventListener("touchmove", e => {
 		for (let t of e.changedTouches) {
 			clearInterval(this.anim)
@@ -198,9 +192,6 @@ export default {
 			else if (this.touch2 && this.touch2.identifier == t.identifier) this.touch2 = t
 		}
   })
-	oncontextmenu = e => {
-    e.preventDefault()
-  }
   this.setsize(this.WIDTH, this.HEIGHT)
   },
   methods:{
@@ -299,8 +290,7 @@ export default {
         this.pos()
         if (this.z >= 0.4) clearInterval(this.anim)
       }, 15)
-    }
-
+    },
   }
   
 }
