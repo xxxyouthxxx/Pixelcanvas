@@ -1,36 +1,19 @@
 <template>
   <div id="maincontent" ref="maincontent">
     <div id="posel" noselect>{{ position }} {{ zoom }}x</div>
-    <div id="place" noselect v-on:click="zoomIn() ,showPalette()" @click="show =! show" v-if="!show">💥</div>
-    <div id="ishide" noselect v-on:click="ishide()" v-if="show" @click="show =! show">❌</div>
+    <div id="place" noselect v-on:click="showPalette()" @click="show =! show" v-if="!show">💥</div>
+    <div id="ishide" noselect v-on:click="hidePalette()" v-if="show" @click="show =! show">❌</div>
     <canvas id="canvas" ref="canvas" width="0" height="0" noselect></canvas>
     <div id="canvparent1" ref="canvparent1" noselect></div>
     <div id="canvparent2" ref="canvparent2" noselect>
       <div id="canvselect" ref="canvselect">
-        <img src="../assets/pixel-select.svg" style="position: absolute; top: -10%; left: -10%; width: 120%; height: 120%;" draggable="false">
+        <img @click="show = !show;show ? showPalette():hidePalette()" src="../assets/pixel-select.svg" style="position: absolute; top: -10%; left: -10%; width: 120%; height: 120%;" draggable="false">
       </div>
       <img id="templateImage" ref="templateImage" width="auto" height="auto" draggable="false">
     </div>
 
     <div id="palette" ref="palette" style="transform: translateY(100%)" noselet>
-      <div id="colours" ref="colours" v-on:click="(e) =>{
-      let i = [...this.$refs.colours.children].indexOf(e.target)
-			if (i < 0) return
-			let el = this.$refs.colours.children[this.PEN]
-			if (el) {
-				el.classList.remove('sel')
-			}
-			this.PEN = i
-			this.$refs.canvselect.style.background = e.target.style.background
-			e.target.classList.add('sel')
-			// pok.classList.add('enabled')
-			this.$refs.canvselect.children[0].style.display = 'none';
-			this.$refs.canvselect.style.outline = '8px white solid';
-			this.$refs.canvselect.style.boxShadow = '0px 2px 4px 0px rgb(0 0 0 / 50%)'
-			}"></div>
-      <!-- <div class="buttons">
-        <div class="ishide" v-on:click="ishide()">❌</div>
-      </div> -->
+      <div id="colours" ref="colours" v-on:click="colourSelect"></div>
     </div>
   </div>
 </template>
@@ -201,14 +184,6 @@ export default {
       clearInterval(this.anim)
       clientX = Math.floor(this.x + (clientX - innerWidth /2) / this.z / 50) + 0.5
       clientY = Math.floor(this.y + (clientY - this.$refs.maincontent.offsetHeight /2) / this.z / 50) + 0.5
-      if (clientX == Math.floor(this.x) + 0.5 && clientY == Math.floor(this.y) + 0.5) {
-        clientX -= 0.5
-        clientY -= 0.5
-        this.zoomIn()
-        this.showPalette()
-        this.show = true
-        return
-      }
       this.anim = setInterval(() => {
       this.x += (clientX - this.x) / 10
       this.y += (clientY - this.y) / 10
@@ -217,7 +192,6 @@ export default {
         },15)
     },
     zoomIn() {
-      console.log('zoomIn', this.z);
       if (this.z >= 0.4) return
       clearInterval(this.anim)
       let dz = 0.005
@@ -227,16 +201,22 @@ export default {
         if (this.z >= 0.4) clearInterval(this.anim)
       }, 15)
     },
+    zoomOut() {
+      if (this.z <= 0.1) return
+      clearInterval(this.anim)
+      let dz = -0.005
+      this.anim = setInterval(() => {
+        this.z += dz
+        this.pos()
+        if (this.z <= 0.2) clearInterval(this.anim)
+      }, 15)
+    },
     showPalette() {
       this.$refs.palette.style.transform = ''
+      this.zoomIn()
     },
-    generatePalette() {
-		// eslint-disable-next-line
-		this.$refs.colours.innerHTML = this.PALETTE.map((colour, i) =>
-				`<div style='background:rgba(${colour & 255},${(colour >> 8) & 255},${(colour >> 16) & 255}, 1)${colour == 0xffffffff ? "; outline: 1px #ddd solid; outline-offset: -1px" : ""}'><span></span></div>`
-			).join("")
-    },
-    ishide() {
+
+    hidePalette() {
       this.$refs.canvselect.style.background = ''
       this.$refs.palette.style.transform = 'translateY(100%)'
       if (this.PEN != -1) {
@@ -247,24 +227,67 @@ export default {
       this.$refs.canvselect.children[0].style.display = 'block'
       this.$refs.canvselect.style.outline = ''
       this.$refs.canvselect.style.boxShadow = ''
+      this.zoomOut()
     },
-    coloursPick(e) {
-      console.log(e);
-      let i = [...this.$refs.colours.children].indexOf(e.target)
-      if (i < 0) return
-      let el = this.$refs.colours.children[this.PEN]
-      if (el) {
-        el.classList.remove('sel')
-      }
-      this.PEN = i
-      this.$refs.canvselect.style.background = e.target.style.background
-      e.target.classList.add('sel')
-      // pok.classList.add('enabled')
-      this.$refs.canvselect.children[0].style.display = 'none';
-      this.$refs.canvselect.style.outline = '8px white solid';
-      this.$refs.canvselect.style.boxShadow = '0px 2px 4px 0px rgb(0 0 0 / 50%)'
-      // hideIndicators()
+
+    generatePalette() {
+		// eslint-disable-next-line
+		this.$refs.colours.innerHTML = this.PALETTE.map((colour, i) =>
+				`<div style='background:rgba(${colour & 255},${(colour >> 8) & 255},${(colour >> 16) & 255}, 1)${colour == 0xffffffff ? "; outline: 1px #ddd solid; outline-offset: -1px" : ""}'><span></span></div>`
+			).join("")
     },
+
+    colourSelect(e) {
+        let i = [...this.$refs.colours.children].indexOf(e.target)
+        if (i < 0) return
+        let el = this.$refs.colours.children[this.PEN]
+        if (el) {
+            if (el === e.target) { // 如果点击的是已选中的颜色，则取消选择
+                el.classList.remove('sel')
+                this.$refs.canvselect.style.background = ''
+                this.PEN = -1
+                this.$refs.canvselect.children[0].style.display = 'block';
+                this.$refs.canvselect.style.outline = ''
+                this.$refs.canvselect.style.boxShadow = ''
+            } else {
+                el.classList.remove('sel')
+                this.PEN = i
+                this.$refs.canvselect.style.background = e.target.style.background
+                e.target.classList.add('sel')
+                this.$refs.canvselect.children[0].style.display = 'none';
+                this.$refs.canvselect.style.outline = '8px white solid';
+                this.$refs.canvselect.style.boxShadow = '0px 2px 4px 0px rgb(0 0 0 / 50%)'
+            }
+        } else {
+            this.PEN = i
+            this.$refs.canvselect.style.background = e.target.style.background
+            e.target.classList.add('sel')
+            this.$refs.canvselect.children[0].style.display = 'none';
+            this.$refs.canvselect.style.outline = '8px white solid';
+            this.$refs.canvselect.style.boxShadow = '0px 2px 4px 0px rgb(0 0 0 / 50%)'
+        }
+    },
+	//这段代码定义了set函数，用于在指定位置绘制指定颜色的像素，
+	set(x, y, b) {
+		
+	},
+	put(){
+		
+		set(Math.floor(x), Math.floor(y), PEN)
+		canvselect.children[0].style.display='block'
+		canvselect.style.outline = ""
+		canvselect.style.boxShadow = ""
+		AUDIOS.cooldownStart.run()
+		CD = Date.now() + (localStorage.vip ? (localStorage.vip[0] == '!' ? 0 : COOLDOWN/2) : COOLDOWN)
+
+		let pixelView = new DataView(new Uint8Array(6).buffer)
+		pixelView.setUint8(0, 4)
+		pixelView.setUint32(1, Math.floor(x) + Math.floor(y) * WIDTH)
+		pixelView.setUint8(5, PEN)
+		PEN = -1
+		localStorage.placed = (localStorage.placed >>> 0) + 1
+		call(send, ws, pixelView)
+	},
     // 以下开始写事件监听器
     handleTouchStart(e) {
       for (let t of e.changedTouches) {
