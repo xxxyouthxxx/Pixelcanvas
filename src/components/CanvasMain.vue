@@ -1,6 +1,8 @@
 <template>
   <div id="maincontent" ref="maincontent">
     <div id="posel" noselect>{{ position }} {{ zoom }}x</div>
+    <div id="place" noselect v-on:click="zoomIn() ,showPalette()" @click="show =! show" v-if="!show">💥</div>
+    <div id="ishide" noselect v-on:click="ishide()" v-if="show" @click="show =! show">❌</div>
     <canvas id="canvas" ref="canvas" width="0" height="0" noselect></canvas>
     <div id="canvparent1" ref="canvparent1" noselect></div>
     <div id="canvparent2" ref="canvparent2" noselect>
@@ -9,12 +11,26 @@
       </div>
       <img id="templateImage" ref="templateImage" width="auto" height="auto" draggable="false">
     </div>
-    <div id="palette" ref="palette" :style="{transform: `translateY(100%)`}" noselect>
-      <div id="colors" ref="colors">
-        <div v-for="(colour, i) in PALETTE" :key="i" :style="'background: rgba(' + (colour & 255) + ',' + ((colour >> 8) & 255) + ',' + ((colour >> 16) & 255) + ', 1)' + (colour == 0xffffffff ? '; outline: 1px #ddd solid; outline-offset: -1px' : '')">
-          <span></span>
-        </div>
-      </div>
+
+    <div id="palette" ref="palette" style="transform: translateY(100%)" noselet>
+      <div id="colours" ref="colours" v-on:click="(e) =>{
+      let i = [...this.$refs.colours.children].indexOf(e.target)
+			if (i < 0) return
+			let el = this.$refs.colours.children[this.PEN]
+			if (el) {
+				el.classList.remove('sel')
+			}
+			this.PEN = i
+			this.$refs.canvselect.style.background = e.target.style.background
+			e.target.classList.add('sel')
+			// pok.classList.add('enabled')
+			this.$refs.canvselect.children[0].style.display = 'none';
+			this.$refs.canvselect.style.outline = '8px white solid';
+			this.$refs.canvselect.style.boxShadow = '0px 2px 4px 0px rgb(0 0 0 / 50%)'
+			}"></div>
+      <!-- <div class="buttons">
+        <div class="ishide" v-on:click="ishide()">❌</div>
+      </div> -->
     </div>
   </div>
 </template>
@@ -24,6 +40,7 @@ export default {
     return {
       connectMessage: '已连接',
       isPaleteOpen: false,
+      show: false,
       PALETTE:[
         0xff1a006d, 
         0xff3900be, 
@@ -78,6 +95,7 @@ export default {
       mx: 0,
       my: 0,
       anim: null,
+      PEN: -1,
       arrowkeyDown:{
         left: false,
         right: false,
@@ -87,112 +105,29 @@ export default {
     }
   },
   mounted() {
-	window.addEventListener("touchstart", e => {
-        for (let t of e.changeTouches) {
-          if (!this.touch1) this.touch1 = t, this.touchmoved = 15
-          else if (!this.touch2) this.touch2 =t
-          else [this.touch1,this.touch2] = [this.touch2, t]
-        }
-    })
-	window.addEventListener("mousedown", e => {
-      console.log('mousedown');
-      this.move = 3
-      this.click = e.button + 1
-    })
-	window.addEventListener("mouseup", e => {
-		console.log('mouseup');
-      if (e.target != this.$refs.maincontent && !this.$refs.canvparent2.contains(e.target))
-        return (this.move = 3, this.click = 0)
-      if (this.move > 0 && this.$refs.canvparent2.contains(e.target)) {
-        this.clicked(e.clientX, e.clientY)
-      }
-      this.move = 3
-      this.click = 0
-    })
-	window.addEventListener("keyup", e => {
-      let i = 10
-      let repeatFunc = setInterval(
-        () => {
-          switch (e.keyCode) {
-            case 37:
-              this.x -= i / 55
-              this.arrowkeyDown.left = false
-              break 
-            case 38:
-              this.y -= i / 55
-              this.arrowkeyDown.up = false
-              break
-            case 39:
-              this.x += i / 55
-              this.arrowkeyDown.right = false
-              break
-            case 40:
-              this.y += i / 55
-              this.arrowkeyDown.down = false
-              break
-          }
-          this.pos()
-          i--
-          if (i <= 0) clearInterval(repeatFunc)
-        },16)
-  })
-  oncontextmenu = e => {
-    e.preventDefault()
-  }
-	window.addEventListener("mousemove", e => {
-      if (e.target != this.$refs.maincontent && !this.$refs.canvparent2.contains(e.target)) return
-      this.moved --
-      let dx = -(this.mx - (this.mx = e.clientX - innerWidth / 2))
-      let dy = -(this.my - (this.my = e.clientY - this.$refs.maincontent.offsetHeight / 2))
-      if (dx != dx || dy != dy) return
-      if (this.click) {
-        this.x -= dx / (this.z * 50)
-        this.y -= dy / (this.z * 50)
-        this.pos()
-        clearInterval(this.anim)
-      }
-  })
-  window.addEventListener("wheel", (e) =>{
-      if (e.target != this.$refs.maincontent && !this.$refs.canvparent2.contains(e.target)) return
-      let d = Math.max(this.minZoom / this.z, Math.min(3 ** Math.max(-0.5, Math.min(0.5, e.deltaY * -0.01)),1 / this.z))
-      this.z *= d
-      this.x += this.my * (d - 1) / this.z / 50
-      this.y -= this.mx * (d - 1) / this.z / 50
-      console.log('x:',this.x,'y:', this.y,'zoomLevel:', this.z);
-      this.pos()
-  })
-	window.addEventListener("touchmove", e => {
-		for (let t of e.changedTouches) {
-			clearInterval(this.anim)
-			a: if (!this.touch2 && this.touch1 && this.touch1.identifier == t.identifier) {
-				this.touchmoved -= Math.abs(t.clientY - this.touch1.clientY) + Math.abs(t.clientX - this.touch1.clientX)
-				if (e.target != this.$refs.maincontent && !this.$refs.canvparent2.contains(e.target)) break a
-				this.x -= (t.clientX - this.touch1.clientX) / (this.z * 50)
-				this.y -= (t.clientY - this.touch1.clientY) / (this.z * 50)
-				this.pos()
-			}
-			else if (this.touch1 && this.touch2) {
-				if (e.target != this.$refs.maincontent && !this.$refs.canvparent2.contains(e.target)) break a
-				let touch = this.touch1.identifier == t.identifier ? this.touch1 : (this.touch2.identifier == t.identifier ? this.touch2 : null)
-				if (!touch) break a
-				let other = touch == this.touch1 ? this.touch2 : this.touch1
-				this.x -= (t.clientX - touch.clientX) / (this.z * 50)
-				this.y -= (t.clientY - touch.clientY) / (this.z * 50)
-				this.touchmoved -= Math.abs(t.clientY - touch.clientY) + Math.abs(t.clientX - touch.clientX)
-				let dx = touch.clientX - other.clientX
-				let dy = touch.clientY - other.clientY
-				let a = dx * dx + dy * dy
-				dx = t.clientX - other.clientX
-				dy = t.clientY - other.clientY
-				a = Math.sqrt((dx * dx + dy * dy) / a)
-				this.z *= a
-				this.pos()
-			}
-			if (this.touch1 && this.touch1.identifier == t.identifier) this.touch1 = t
-			else if (this.touch2 && this.touch2.identifier == t.identifier) this.touch2 = t
-		}
-  })
-  this.setsize(this.WIDTH, this.HEIGHT)
+    document.body.addEventListener("touchstart", this.handleTouchStart)
+    document.body.addEventListener("touchend", this.handleTouchEnd)
+    document.body.addEventListener("mousedown", this.handleMouseDown)
+    document.addEventListener("mouseup",this.handleMouseUp)
+    document.body.addEventListener("keyup", this.handleKeyUp)
+    document.body.addEventListener("mousemove", this.handleMouseMove)
+    document.body.addEventListener("wheel", this.handleWheel)
+    document.body.addEventListener("touchmove", this.handleTouchMove)
+    oncontextmenu = e => {
+      e.preventDefault()
+    }
+    this.setsize(this.WIDTH, this.HEIGHT)
+    this.generatePalette()
+  },
+  beforeUnmount() {
+    document.body.removeEventListener("touchstart", this.handleTouchStart)
+    document.body.removeEventListener("touchend", this.handleTouchEnd)
+    document.body.removeEventListener("mousedown", this.handleMouseDown)
+    document.removeEventListener("mouseup",this.handleMouseUp)
+    document.body.removeEventListener("keyup", this.handleKeyUp)
+    document.body.removeEventListener("mousemove", this.handleMouseMove)
+    document.body.removeEventListener("touchmove", this.handleTouchMove)
+    document.body.removeEventListener("wheel", this.handleWheel)
   },
   methods:{
     setsize(w, h = w) {
@@ -271,14 +206,15 @@ export default {
         clientY -= 0.5
         this.zoomIn()
         this.showPalette()
+        this.show = true
         return
       }
-    this.anim = setInterval(() => {
-		this.x += (clientX - this.x) / 10
-		this.y += (clientY - this.y) / 10
-		this.pos()
-		if (Math.abs(clientX - this.x) + Math.abs(clientY - this.y) < 0.1) clearInterval(this.anim)
-      },15)
+      this.anim = setInterval(() => {
+      this.x += (clientX - this.x) / 10
+      this.y += (clientY - this.y) / 10
+      this.pos()
+      if (Math.abs(clientX - this.x) + Math.abs(clientY - this.y) < 0.1) clearInterval(this.anim)
+        },15)
     },
     zoomIn() {
       console.log('zoomIn', this.z);
@@ -290,6 +226,160 @@ export default {
         this.pos()
         if (this.z >= 0.4) clearInterval(this.anim)
       }, 15)
+    },
+    showPalette() {
+      this.$refs.palette.style.transform = ''
+    },
+    generatePalette() {
+		// eslint-disable-next-line
+		this.$refs.colours.innerHTML = this.PALETTE.map((colour, i) =>
+				`<div style='background:rgba(${colour & 255},${(colour >> 8) & 255},${(colour >> 16) & 255}, 1)${colour == 0xffffffff ? "; outline: 1px #ddd solid; outline-offset: -1px" : ""}'><span></span></div>`
+			).join("")
+    },
+    ishide() {
+      this.$refs.canvselect.style.background = ''
+      this.$refs.palette.style.transform = 'translateY(100%)'
+      if (this.PEN != -1) {
+        this.$refs.colours.children[this.PEN].classList.remove('sel')
+        this.PEN = -1
+      }
+      // pok.classList.remove('enabled')
+      this.$refs.canvselect.children[0].style.display = 'block'
+      this.$refs.canvselect.style.outline = ''
+      this.$refs.canvselect.style.boxShadow = ''
+    },
+    coloursPick(e) {
+      console.log(e);
+      let i = [...this.$refs.colours.children].indexOf(e.target)
+      if (i < 0) return
+      let el = this.$refs.colours.children[this.PEN]
+      if (el) {
+        el.classList.remove('sel')
+      }
+      this.PEN = i
+      this.$refs.canvselect.style.background = e.target.style.background
+      e.target.classList.add('sel')
+      // pok.classList.add('enabled')
+      this.$refs.canvselect.children[0].style.display = 'none';
+      this.$refs.canvselect.style.outline = '8px white solid';
+      this.$refs.canvselect.style.boxShadow = '0px 2px 4px 0px rgb(0 0 0 / 50%)'
+      // hideIndicators()
+    },
+    // 以下开始写事件监听器
+    handleTouchStart(e) {
+      for (let t of e.changedTouches) {
+				if (!this.touch1){
+          this.touch1 = t
+          this.touchmoved = 15
+        } else if (!this.touch2) {
+          this.touch2 = t
+        } else {
+          [this.touch1, this.touch2] = [this.touch2, t]
+        }
+			}
+    },
+    handleTouchEnd(e) {
+      for (let t of e.changedTouches) {
+        if (this.touch1 && this.touch1.identifier == t.identifier) {
+          this.touch1 = null
+          this.touchmoved = 0
+        } else if (this.touch2 && this.touch2.identifier == t.identifier) {
+          this.touch2 = null
+        }
+      }
+    },
+    handleTouchMove(e) {
+      for (let t of e.changedTouches) {
+        clearInterval(this.anim)
+        if (!this.touch2 && this.touch1 && this.touch1.identifier == t.identifier) {
+          this.touchmoved -= Math.abs(t.clientY - this.touch1.clientY) + Math.abs(t.clientX - this.touch1.clientX)
+          if (e.target != this.$refs.maincontent && !this.$refs.canvparent2.contains(e.target)) break
+          this.x -= (t.clientX - this.touch1.clientX) / (this.z * 50)
+          this.y -= (t.clientY - this.touch1.clientY) / (this.z * 50)
+          this.pos()
+        } else if (this.touch1 && this.touch2) {
+          if (e.target != this.$refs.maincontent && !this.$refs.canvparent2.contains(e.target)) break
+          const touch = this.touch1.identifier == t.identifier ? this.touch1 : (this.touch2.identifier == t.identifier ? this.touch2 : null)
+          if (!touch) break
+          let other = touch == this.touch1 ? this.touch2 : this.touch1
+          this.x -= (t.clientX - touch.clientX) / (this.z * 50)
+          this.y -= (t.clientY - touch.clientY) / (this.z * 50)
+          this.touchmoved -= Math.abs(t.clientY - touch.clientY) + Math.abs(t.clientX - touch.clientX)
+          let dx = touch.clientX - other.clientX
+          let dy = touch.clientY - other.clientY
+          let a = dx * dx + dy * dy
+          dx = t.clientX - other.clientX
+          dy = t.clientY - other.clientY
+          a = Math.sqrt((dx * dx + dy * dy) / a)
+          this.z *= a
+          this.pos()
+        }
+        if (this.touch1 && this.touch1.identifier == t.identifier) this.touch1 = t
+        else if (this.touch2 && this.touch2.identifier == t.identifier) this.touch2 = t
+      }
+    },
+    handleMouseDown(e) {
+      this.move = 3
+      this.click = e.button + 1
+    },
+    handleMouseUp(e) {
+      if (e.target != this.$refs.maincontent && !this.$refs.canvparent2.contains(e.target))
+				return (this.moved = 3, this.click = 0)
+
+			if (this.moved > 0 && this.$refs.canvparent2.contains(e.target)) {
+				this.clicked(e.clientX, e.clientY)
+			}
+
+			this.moved = 3
+			this.click = 0
+    },
+    handleKeyUp(e) {
+      let i = 10
+      let repeatFunc = setInterval(
+        () => {
+          switch (e.keyCode) {
+            case 37:
+              this.x -= i / 55
+              this.arrowkeyDown.left = false
+              break 
+            case 38:
+              this.y -= i / 55
+              this.arrowkeyDown.up = false
+              break
+            case 39:
+              this.x += i / 55
+              this.arrowkeyDown.right = false
+              break
+            case 40:
+              this.y += i / 55
+              this.arrowkeyDown.down = false
+              break
+          }
+          this.pos()
+          i--
+          if (i <= 0) clearInterval(repeatFunc)
+        },16)
+    },
+    handleMouseMove(e) {
+    if (e.target != this.$refs.maincontent && !this.$refs.canvparent2.contains(e.target)) return
+      this.moved --
+      let dx = -(this.mx - (this.mx = e.clientX - innerWidth / 2))
+      let dy = -(this.my - (this.my = e.clientY - this.$refs.maincontent.offsetHeight / 2))
+      if (dx != dx || dy != dy) return
+      if (this.click) {
+        this.x -= dx / (this.z * 50)
+        this.y -= dy / (this.z * 50)
+        this.pos()
+        clearInterval(this.anim)
+      }
+    },
+    handleWheel(e) {
+      if (e.target != this.$refs.maincontent && !this.$refs.canvparent2.contains(e.target)) return
+        let d = Math.max(this.minZoom / this.z, Math.min(3 ** Math.max(-0.5, Math.min(0.5, e.deltaY * -0.01)),1 / this.z))
+        this.z *= d
+        this.x += this.my * (d - 1) / this.z / 50
+        this.y -= this.mx * (d - 1) / this.z / 50
+        this.pos()
     },
   }
   
@@ -518,13 +608,11 @@ btn{
 
 #place{
 	position: absolute;
-	bottom: 20px;
-	left: 50%;
+	bottom: 70px;
+	left: 98%;
 	transform: translateX(-50%);
-	width: 155px;
-	height: 24px;
+	width: 30px;
 	padding: 5px;
-	line-height: 15px;
 	background: white;
 	border-radius: 100px;
 	text-align: center;
@@ -634,7 +722,7 @@ btn{
 }
 
 #colours {
-	padding: 14px 14px 0 14px;
+	padding: 14px 14px 14px 14px;
 	display: flex;
 	flex-direction: row;
 	flex-wrap: wrap;
@@ -645,18 +733,20 @@ btn{
 	flex-direction: row;
 	justify-content: center;
 	gap: 16px;
-	padding: 14px 16px 16px 16px;
+	padding: 16px 16px 16px 16px;
 }
 
-.pcancel, .pok{
-	width: 100px;
-	height: 40px;
-	border-radius: 50px;
-	border: 1px #d4d7d9 solid;
-	padding: 9px;
+#ishide{
+	position: absolute;
+	bottom: 70px;
+	left: 98%;
+	transform: translateX(-50%);
+	width: 30px;
+	padding: 5px;
+	background: white;
+	border-radius: 100px;
 	text-align: center;
-	cursor: pointer;
-	min-width: 162px;
+	z-index: 5;
 }
 .pok{
 	border: 4px #f1f1f1 solid;
@@ -715,7 +805,7 @@ btn{
 	}
 }
 
-#helpbtn, #posel, #place, #archiveView, .toastMenu, #captchaPopup, #closebtn, #timelapsePanel {
+#helpbtn, #posel, #place, #archiveView, .toastMenu, #ishide,#captchaPopup, #closebtn, #timelapsePanel {
 	box-shadow: 0 0 30px black;
 }
 
