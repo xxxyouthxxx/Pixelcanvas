@@ -3,6 +3,7 @@
     <div id="posel" noselect>{{ position }} {{ zoom }}x</div>
     <div id="place" noselect v-on:click="showPalette()" @click="show =! show" v-if="!show">💥</div>
     <div id="ishide" noselect v-on:click="hidePalette()" v-if="show" @click="show =! show">❌</div>
+		<div id="grid" noselect></div>
     <canvas id="canvas" ref="canvas" width="0" height="0" noselect></canvas>
     <div id="canvparent1" ref="canvparent1" noselect></div>
     <div id="canvparent2" ref="canvparent2" noselect>
@@ -24,6 +25,7 @@ export default {
       connectMessage: '已连接',
       isPaleteOpen: false,
       show: false,
+			grid: true,
 			colorSelected: false,
 			isFlashing:false,
       PALETTE:[
@@ -74,7 +76,7 @@ export default {
       x:null,
       y:null,
       z:null,
-      board: new Uint8Array(),
+      board: null,
 			xa: null,
 			xb: null,
       minZoom: null,
@@ -109,6 +111,7 @@ export default {
     }
     this.setsize(this.WIDTH, this.HEIGHT)
     this.generatePalette()
+		this.showGrid()
   },
   beforeUnmount() {
     document.body.removeEventListener("touchstart", this.handleTouchStart)
@@ -196,7 +199,6 @@ export default {
       this.x += (clientX - this.x) / 10
       this.y += (clientY - this.y) / 10
       this.pos()
-			console.log(this.x,this.y);
 				if (Math.abs(clientX - this.x) + Math.abs(clientY - this.y) < 0.1) {
 					clearInterval(this.anim)
 					this.put()
@@ -283,34 +285,38 @@ export default {
             this.$refs.canvselect.style.boxShadow = '0px 2px 4px 0px rgb(0 0 0 / 50%)'
         }
     },
-	//这段代码定义了set函数，用于在指定位置绘制指定颜色的像素，
-	set(x, y, b) {
-		// 
-		this.isFlashing = true
-		this.board[x % this.$refs.canvas.width + (y % this.$refs.canvas.height) * this.$refs.canvas.width] = b
-		this.xa[0] = this.PALETTE[b]
-		this.canvasCtx.fillStyle = "#" + (this.xb[0] < 16 ? "0" : "") + this.xb[0].toString(16) + (this.xb[1] < 16 ? "0" : "") + this.xb[1].toString(16) + (this.xb[2] < 16 ? "0" : "") + this.xb[2].toString(16) + (this.xb[3] < 16 ? "0" : "") + this.xb[3].toString(16)
-		this.canvasCtx.clearRect(x, y, 1, 1)
-		this.canvasCtx.fillRect(x, y, 1, 1)
-		setTimeout(() => {
-			this.isFlashing = false
-		}, 1000)
-	},
-	put(){
-		if (this.colorSelected) {
-			this.set(Math.floor(this.x), Math.floor(this.y), this.PEN)
-		// 创建一个DataView对象，用于存储要发送的数据。
-		let pixelView = new DataView(new Uint8Array(6).buffer)
-		// 设置DataView的第一个字节为4，表示要发送的数据是像素数据。
-		pixelView.setUint8(0, 4)
-		// 将像素的位置坐标写入DataView的第2~5个字节中。
-		pixelView.setUint32(1, Math.floor(this.x) + Math.floor(this.y) * this.WIDTH)
-		// 将要填充的像素的颜色值写入DataView的第6个字节中。
-		pixelView.setUint8(5, this.PEN)
-		localStorage.placed = (localStorage.placed >>> 0) + 1
-		// TODO: 通过WebSocket发送数据
-		}
-	},
+		//这段代码定义了set函数，用于在指定位置绘制指定颜色的像素，
+		set(x, y, b) {
+			// 
+			this.isFlashing = true
+			this.board[x % this.$refs.canvas.width + (y % this.$refs.canvas.height) * this.$refs.canvas.width] = b
+			this.xa[0] = this.PALETTE[b]
+			this.canvasCtx.fillStyle = "#" + (this.xb[0] < 16 ? "0" : "") + this.xb[0].toString(16) + (this.xb[1] < 16 ? "0" : "") + this.xb[1].toString(16) + (this.xb[2] < 16 ? "0" : "") + this.xb[2].toString(16) + (this.xb[3] < 16 ? "0" : "") + this.xb[3].toString(16)
+			this.canvasCtx.clearRect(x, y, 1, 1)
+			this.canvasCtx.fillRect(x, y, 1, 1)
+			setTimeout(() => {
+				this.isFlashing = false
+			}, 1000)
+		},
+		put(){
+			if (this.colorSelected) {
+				this.set(Math.floor(this.x), Math.floor(this.y), this.PEN)
+			// 创建一个DataView对象，用于存储要发送的数据。
+			let pixelView = new DataView(new Uint8Array(6).buffer)
+			// 设置DataView的第一个字节为4，表示要发送的数据是像素数据。
+			pixelView.setUint8(0, 4)
+			// 将像素的位置坐标写入DataView的第2~5个字节中。
+			pixelView.setUint32(1, Math.floor(this.x) + Math.floor(this.y) * this.WIDTH)
+			// 将要填充的像素的颜色值写入DataView的第6个字节中。
+			pixelView.setUint8(5, this.PEN)
+			localStorage.placed = (localStorage.placed >>> 0) + 1
+			// TODO: 通过WebSocket发送数据
+			}
+		},
+		// 定义showGrid函数，用于显示网格
+		showGrid() {
+			
+		},
     // 以下开始写事件监听器
     handleTouchStart(e) {
       for (let t of e.changedTouches) {
