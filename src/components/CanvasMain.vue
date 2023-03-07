@@ -6,7 +6,7 @@
     <canvas id="canvas" ref="canvas" width="0" height="0" noselect></canvas>
     <div id="canvparent1" ref="canvparent1" noselect></div>
     <div id="canvparent2" ref="canvparent2" noselect>
-      <div id="canvselect" ref="canvselect">
+      <div id="canvselect" ref="canvselect" @click="put()" :class="{'pixel-flash': isFlashing }">
         <img @click="show = !show;show ? showPalette():hidePalette()" src="../assets/pixel-select.svg" style="position: absolute; top: -10%; left: -10%; width: 120%; height: 120%;" draggable="false">
       </div>
       <img id="templateImage" ref="templateImage" width="auto" height="auto" draggable="false">
@@ -24,6 +24,8 @@ export default {
       connectMessage: '已连接',
       isPaleteOpen: false,
       show: false,
+			colorSelected: false,
+			isFlashing:false,
       PALETTE:[
         0xff1a006d, 
         0xff3900be, 
@@ -72,7 +74,9 @@ export default {
       x:null,
       y:null,
       z:null,
-      board: null,
+      board: new Uint8Array(),
+			xa: null,
+			xb: null,
       minZoom: null,
       click:false,
       mx: 0,
@@ -88,6 +92,10 @@ export default {
     }
   },
   mounted() {
+		this.canvas = this.$refs.canvas
+		this.canvasCtx = this.canvas.getContext('2d')
+		this.xa = new Uint32Array(1),
+		this.xb = new Uint8Array(this.xa.buffer),
     document.body.addEventListener("touchstart", this.handleTouchStart)
     document.body.addEventListener("touchend", this.handleTouchEnd)
     document.body.addEventListener("mousedown", this.handleMouseDown)
@@ -246,12 +254,14 @@ export default {
                 el.classList.remove('sel')
                 this.$refs.canvselect.style.background = ''
                 this.PEN = -1
+								this.colorSelected = false
                 this.$refs.canvselect.children[0].style.display = 'block';
                 this.$refs.canvselect.style.outline = ''
                 this.$refs.canvselect.style.boxShadow = ''
             } else {
                 el.classList.remove('sel')
                 this.PEN = i
+								this.colorSelected = true
                 this.$refs.canvselect.style.background = e.target.style.background
                 e.target.classList.add('sel')
                 this.$refs.canvselect.children[0].style.display = 'none';
@@ -260,6 +270,7 @@ export default {
             }
         } else {
             this.PEN = i
+						this.colorSelected = true
             this.$refs.canvselect.style.background = e.target.style.background
             e.target.classList.add('sel')
             this.$refs.canvselect.children[0].style.display = 'none';
@@ -269,24 +280,31 @@ export default {
     },
 	//这段代码定义了set函数，用于在指定位置绘制指定颜色的像素，
 	set(x, y, b) {
-		
+		// 
+		this.isFlashing = true
+		this.board[x % this.$refs.canvas.width + (y % this.$refs.canvas.height) * this.$refs.canvas.width] = b
+		this.xa[0] = this.PALETTE[b]
+		this.canvasCtx.fillStyle = "#" + (this.xb[0] < 16 ? "0" : "") + this.xb[0].toString(16) + (this.xb[1] < 16 ? "0" : "") + this.xb[1].toString(16) + (this.xb[2] < 16 ? "0" : "") + this.xb[2].toString(16) + (this.xb[3] < 16 ? "0" : "") + this.xb[3].toString(16)
+		this.canvasCtx.clearRect(x, y, 1, 1)
+		this.canvasCtx.fillRect(x, y, 1, 1)
+		setTimeout(() => {
+			this.isFlashing = false
+		}, 1000)
 	},
 	put(){
-		
-		set(Math.floor(x), Math.floor(y), PEN)
-		canvselect.children[0].style.display='block'
-		canvselect.style.outline = ""
-		canvselect.style.boxShadow = ""
-		AUDIOS.cooldownStart.run()
-		CD = Date.now() + (localStorage.vip ? (localStorage.vip[0] == '!' ? 0 : COOLDOWN/2) : COOLDOWN)
-
+		if (this.colorSelected) {
+			this.set(Math.floor(this.x), Math.floor(this.y), this.PEN)
+		// 创建一个DataView对象，用于存储要发送的数据。
 		let pixelView = new DataView(new Uint8Array(6).buffer)
+		// 设置DataView的第一个字节为4，表示要发送的数据是像素数据。
 		pixelView.setUint8(0, 4)
-		pixelView.setUint32(1, Math.floor(x) + Math.floor(y) * WIDTH)
-		pixelView.setUint8(5, PEN)
-		PEN = -1
+		// 将像素的位置坐标写入DataView的第2~5个字节中。
+		pixelView.setUint32(1, Math.floor(this.x) + Math.floor(this.y) * this.WIDTH)
+		// 将要填充的像素的颜色值写入DataView的第6个字节中。
+		pixelView.setUint8(5, this.PEN)
 		localStorage.placed = (localStorage.placed >>> 0) + 1
-		call(send, ws, pixelView)
+		// TODO: 通过WebSocket发送数据
+		}
 	},
     // 以下开始写事件监听器
     handleTouchStart(e) {
@@ -962,6 +980,19 @@ btn{
 
 #captchaPopup > div > input:hover {
 	transform: scale(1.1);
+}
+
+.pixel-flash {
+  animation: pixel-flash 1s;
+}
+
+@keyframes pixel-flash {
+  from {
+    background-color: yellow;
+  }
+  to {
+    background-color: transparent;
+  }
 }
 
 @media screen and (max-width:700px) { /* TODO: Switch to more future proof orientation portrait */
