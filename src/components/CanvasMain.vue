@@ -196,8 +196,13 @@ export default {
       this.x += (clientX - this.x) / 10
       this.y += (clientY - this.y) / 10
       this.pos()
-      if (Math.abs(clientX - this.x) + Math.abs(clientY - this.y) < 0.1) clearInterval(this.anim)
-        },15)
+			console.log(this.x,this.y);
+				if (Math.abs(clientX - this.x) + Math.abs(clientY - this.y) < 0.1) {
+					clearInterval(this.anim)
+					this.put()
+				}
+      },15)
+			
     },
     zoomIn() {
       if (this.z >= 0.4) return
@@ -265,7 +270,7 @@ export default {
                 this.$refs.canvselect.style.background = e.target.style.background
                 e.target.classList.add('sel')
                 this.$refs.canvselect.children[0].style.display = 'none';
-                this.$refs.canvselect.style.outline = '8px white solid';
+                this.$refs.canvselect.style.outline = '8px gray solid';
                 this.$refs.canvselect.style.boxShadow = '0px 2px 4px 0px rgb(0 0 0 / 50%)'
             }
         } else {
@@ -274,7 +279,7 @@ export default {
             this.$refs.canvselect.style.background = e.target.style.background
             e.target.classList.add('sel')
             this.$refs.canvselect.children[0].style.display = 'none';
-            this.$refs.canvselect.style.outline = '8px white solid';
+            this.$refs.canvselect.style.outline = '8px gray solid';
             this.$refs.canvselect.style.boxShadow = '0px 2px 4px 0px rgb(0 0 0 / 50%)'
         }
     },
@@ -359,21 +364,6 @@ export default {
         else if (this.touch2 && this.touch2.identifier == t.identifier) this.touch2 = t
       }
     },
-    handleMouseDown(e) {
-      this.move = 3
-      this.click = e.button + 1
-    },
-    handleMouseUp(e) {
-      if (e.target != this.$refs.maincontent && !this.$refs.canvparent2.contains(e.target))
-				return (this.moved = 3, this.click = 0)
-
-			if (this.moved > 0 && this.$refs.canvparent2.contains(e.target)) {
-				this.clicked(e.clientX, e.clientY)
-			}
-
-			this.moved = 3
-			this.click = 0
-    },
     handleKeyUp(e) {
       let i = 10
       let repeatFunc = setInterval(
@@ -400,6 +390,23 @@ export default {
           i--
           if (i <= 0) clearInterval(repeatFunc)
         },16)
+    },
+		handleMouseDown(e) {
+      this.moved = 3
+      this.click = e.button + 1
+			console.log('mousedown');
+    },
+    handleMouseUp(e) {
+			console.log('mouseup');
+			if (e.target != this.$refs.maincontent && !this.$refs.canvparent2.contains(e.target)) {
+				return (this.moved = 3, this.click = 0)
+			}
+			if (this.moved > 0 && this.$refs.canvparent2.contains(e.target)) {
+				this.clicked(e.clientX, e.clientY)
+			}
+
+			this.moved = 3
+			this.click = 0
     },
     handleMouseMove(e) {
     if (e.target != this.$refs.maincontent && !this.$refs.canvparent2.contains(e.target)) return
@@ -649,8 +656,9 @@ btn{
 
 #place{
 	position: absolute;
-	bottom: 70px;
-	left: 98%;
+	/* bottom: 70px; */
+	top: 20px;
+	left: 96%;
 	transform: translateX(-50%);
 	width: 30px;
 	padding: 5px;
@@ -779,8 +787,8 @@ btn{
 
 #ishide{
 	position: absolute;
-	bottom: 70px;
-	left: 98%;
+	top: 20px;
+	left: 96%;
 	transform: translateX(-50%);
 	width: 30px;
 	padding: 5px;
