@@ -18,6 +18,7 @@
   </div>
 </template>
 <script>
+import confetti from 'canvas-confetti'
 export default {
   data() {
     return {
@@ -122,10 +123,8 @@ export default {
     document.body.removeEventListener("touchmove", this.handleTouchMove)
     document.body.removeEventListener("wheel", this.handleWheel)
   },
-	watch: {
-		showGrid() {
-			this.drawGrid()
-		}
+  watch: {
+		
 	},
   methods:{
     setsize(w, h = w) {
@@ -303,6 +302,7 @@ export default {
 		setTimeout(() => {
 			this.isFlashing = false
 		}, 1000)
+		this.confettiClick()
 	},
 	put(){
 		if (this.colorSelected) {
@@ -318,6 +318,24 @@ export default {
 		localStorage.placed = (localStorage.placed >>> 0) + 1
 		// TODO: 通过WebSocket发送数据
 		}
+	},
+	// 放置成功后的特效
+	confettiClick() {
+		confetti({
+			particleCount: 10,
+			startVelocity: 10,
+			spread: 40,
+			decay: 0.9,
+			zIndex: 2147483647,
+			gravity: 1.5,
+      scalar:0.5,
+			origin: {
+			x: 0.5,
+			y: 0.5
+		},
+		shapes: ['star'],
+		colors: ['FFE400', 'FFBD00', 'E89400', 'FFCA6C', 'FDFFB8']
+		})
 	},
     // 以下开始写事件监听器
     handleTouchStart(e) {
