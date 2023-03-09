@@ -88,6 +88,10 @@ export default {
       my: 0,
       anim: null,
       PEN: -1,
+      load: false,
+      legacy: true,
+      send: null,
+      call: null,
       arrowkeyDown:{
         left: false,
         right: false,
@@ -114,7 +118,11 @@ export default {
     }
     this.setsize(this.WIDTH, this.HEIGHT)
     this.generatePalette()
-	this.wscapsule()
+    this.send = WebSocket.prototype.send
+    this.call = btoa.call.bind(btoa.call)
+    this.wscapsule()
+    console.log(this.send);
+    console.log(this.call);
   },
   beforeUnmount() {
     document.body.removeEventListener("touchstart", this.handleTouchStart)
@@ -131,36 +139,69 @@ export default {
 	},
   methods:{
 	// 三个函数作为参数：send、addEventListener和call。
-	// 这个函数可能是用来封装WebSocket的，将WebSocket的操作封装在一个“capsule（胶囊）”中，
+	// 这个函数是用来封装WebSocket的，将WebSocket的操作封装在一个“capsule（胶囊）”中，
 	// 从而实现对WebSocket实例的更加灵活的控制和管理。
 	// send函数用于向WebSocket服务器发送消息，
 	// addEventListener函数用于添加WebSocket事件监听器，
 	// call函数用于调用WebSocket实例的方法，比如关闭连接等。
 	// 使得WebSocket实例的使用更加方便和易于管理。	
-	/* eslint-disable */
-		wscapsule: function(send, addEventListener, call) {
-				let ws = new WebSocket('ws://localhost:9249')
-				ws.onmessage = async ({data}) => {
-					delete sessionStorage.err
-					data = new DataView(await data.arrayBuffer())
-					let code = data.getUint8(0)
-					if (code == 1) {
-						this.CD = data.getUint32(1) * 1000
-						this.COOLDOWN = data.getUint32(5)
-						console.log(this.CD, this.COOLDOWN);
-						if (data.byteLength == 17) {
-							this.width = data.getUint32(9)
-							this.height = data.getUint32(13)
-							this.setsize(this.width, this.height)
-
-							if (load) {
-
-							}
-						}
-					}
-				}
-			},
-	    setsize(w, h = w) {
+		wscapsule(){
+      let ws = new WebSocket('ws://localhost:9249')
+      ws.onmessage = async ({data}) => {
+        delete sessionStorage.err
+        data = new DataView(await data.arrayBuffer())
+        let code = data.getUint8(0)
+        if (code == 1) {
+          this.CD = data.getUint32(1) * 1000
+          this.COOLDOWN = data.getUint32(5)
+          if (data.byteLength == 17) {
+            this.width = data.getUint32(9)
+            this.height = data.getUint32(13)
+            this.setsize(this.width, this.height)
+            if (this.load) {
+              this.board = new Uint8Array(this.load)
+              this.renderAll()
+              console.log('renderAll is called');
+            }
+          }
+        } else if (code == 2) {
+          if (!this.load) {
+            this.load = data
+          } else {
+            this.runLengthChanges(data, this.load)
+          }
+        }
+      }
+    },
+    runLengthChanges(data, a) {
+      let i = 9
+      let boardI = 0
+      let w = data.getUint32(1), h = data.getUint32(5)
+      if (w != this.WIDTH || h != this.HEIGHT) {
+        this.setsize(w, h)
+      }
+      this.board = new Uint8Array(a)
+      while (i < data.byteLength) {
+        let cell = data.getUint8(i++)
+        let c = cell >> 6
+        if (c == 1) c = data.getUint8(i++)
+        else if (c == 2) c = data.getUint16(i++), i++
+        else if (c == 3) c = data.getUint32(i++), i += 3
+        boardI += c
+        this.board[boardI++] = cell & 63
+      }
+      this.renderAll()
+    },
+    renderAll() {
+        let img = new ImageData(this.$refs.canvas.width, this.$refs.canvas.height)
+        let data = new Uint32Array(img.data.buffer)
+        for (let i = 0; i < this.board.length; i++) {
+          data[i] = this.palette[this.board[i]]
+        }
+        this.canvasCtx.putImageData(img, 0, 0)
+        this.canvasCtx.getImageData(0, 0, 1, 1)
+    },
+    setsize(w, h = w) {
       this.$refs.canvas.width = this.WIDTH = w
       this.$refs.canvas.height = this.HEIGHT = h
       this.$refs.canvparent1.style.width = `${w}px`
@@ -294,31 +335,31 @@ export default {
         if (el) {
             if (el === e.target) { // 如果点击的是已选中的颜色，则取消选择
                 el.classList.remove('sel')
-				this.zoomOut()
+                this.zoomOut()
                 this.$refs.canvselect.style.background = ''
                 this.PEN = -1
-				this.colorSelected = false
+                this.colorSelected = false
                 this.$refs.canvselect.children[0].style.display = 'block';
                 this.$refs.canvselect.style.outline = ''
                 this.$refs.canvselect.style.boxShadow = ''
             } else {
                 el.classList.remove('sel')
                 this.PEN = i
-				this.colorSelected = true
+                this.colorSelected = true
                 this.$refs.canvselect.style.background = e.target.style.background
                 e.target.classList.add('sel')
-				this.zoomIn()
+                this.zoomIn()
                 this.$refs.canvselect.children[0].style.display = 'none';
                 this.$refs.canvselect.style.outline = '8px gray solid';
                 this.$refs.canvselect.style.boxShadow = '0px 2px 4px 0px rgb(0 0 0 / 50%)'
             }
         } else {
             this.PEN = i
-			this.colorSelected = true
+            this.colorSelected = true
             this.$refs.canvselect.style.background = e.target.style.background
             e.target.classList.add('sel')
             this.zoomIn()
-			this.$refs.canvselect.children[0].style.display = 'none';
+            this.$refs.canvselect.children[0].style.display = 'none';
             this.$refs.canvselect.style.outline = '8px gray solid';
             this.$refs.canvselect.style.boxShadow = '0px 2px 4px 0px rgb(0 0 0 / 50%)'
         }
