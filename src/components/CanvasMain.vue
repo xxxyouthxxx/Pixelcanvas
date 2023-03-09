@@ -65,6 +65,8 @@ export default {
       HEIGHT: 500,
       position: '(0, 0)',
       zoom: 2.5,
+			CD: 0,
+			COOLDOWN: 0,
       touch1: null,
       touch2: null,
       touchmoved: 15,
@@ -112,6 +114,7 @@ export default {
     }
     this.setsize(this.WIDTH, this.HEIGHT)
     this.generatePalette()
+	this.wscapsule()
   },
   beforeUnmount() {
     document.body.removeEventListener("touchstart", this.handleTouchStart)
@@ -127,7 +130,37 @@ export default {
 		
 	},
   methods:{
-    setsize(w, h = w) {
+	// 三个函数作为参数：send、addEventListener和call。
+	// 这个函数可能是用来封装WebSocket的，将WebSocket的操作封装在一个“capsule（胶囊）”中，
+	// 从而实现对WebSocket实例的更加灵活的控制和管理。
+	// send函数用于向WebSocket服务器发送消息，
+	// addEventListener函数用于添加WebSocket事件监听器，
+	// call函数用于调用WebSocket实例的方法，比如关闭连接等。
+	// 使得WebSocket实例的使用更加方便和易于管理。	
+	/* eslint-disable */
+		wscapsule: function(send, addEventListener, call) {
+				let ws = new WebSocket('ws://localhost:9249')
+				ws.onmessage = async ({data}) => {
+					delete sessionStorage.err
+					data = new DataView(await data.arrayBuffer())
+					let code = data.getUint8(0)
+					if (code == 1) {
+						this.CD = data.getUint32(1) * 1000
+						this.COOLDOWN = data.getUint32(5)
+						console.log(this.CD, this.COOLDOWN);
+						if (data.byteLength == 17) {
+							this.width = data.getUint32(9)
+							this.height = data.getUint32(13)
+							this.setsize(this.width, this.height)
+
+							if (load) {
+
+							}
+						}
+					}
+				}
+			},
+	    setsize(w, h = w) {
       this.$refs.canvas.width = this.WIDTH = w
       this.$refs.canvas.height = this.HEIGHT = h
       this.$refs.canvparent1.style.width = `${w}px`
