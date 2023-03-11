@@ -121,7 +121,7 @@ export default {
     this.generatePalette()
     this.send = WebSocket.prototype.send
     this.call = btoa.call.bind(btoa.call)
-    this.ws = new WebSocket('ws://localhost:9249')
+    this.ws = new WebSocket('ws://127.0.0.1:9249')
     this.wscapsule()
   },
   beforeUnmount() {
@@ -145,29 +145,11 @@ export default {
         let code = data.getUint8(0)
 		console.log('code:',code);
         if (code == 1) {
-          this.CD = data.getUint32(1) * 1000
-          this.COOLDOWN = data.getUint32(5)
-          if (data.byteLength == 17) {
-            console.log('data.byteLength == 17');
-            this.WIDTH = data.getUint32(9)
-            this.HEIGHT = data.getUint32(13)
-            this.setsize(this.WIDTH, this.HEIGHT)
-            if (this.load) {
-              this.board = new Uint8Array(this.load)
-              this.renderAll()
-            }
-          }
+          console.log("code.length:",data.byteLength);
         } else if (code == 2) {
-          if (!this.load) {
-            this.load = data
-          } else {
-            this.runLengthChanges(data, this.load)
-          }
+          console.log('2');
         } else if (code == 6) {
-			let i = 0
-			while (i < data.byteLength - 2) {
-				
-			}
+			console.log('6');
 		}
       }
     },
@@ -201,6 +183,13 @@ export default {
         this.canvasCtx.getImageData(0, 0, 1, 1)
 		console.log('renderAll end');
     },
+	seti(i, b) {
+		console.log(this.xa[0]);
+		this.board[i] = b
+		this.xa[0] = this.PALETTE[b]
+		this.canvasCtx.fillStyle = "#" + (this.xb[0] < 16 ? "0": "") + this.xb[1].toString(16) + (this.xb[2] < 16 ? "0" : "") + this.xb[2].toString(16) + (this.xb[3] < 16 ? "0" : "") + this.xb[3].toString(16)
+		this.canvasCtx.fillRect(i % this.WIDTH, Math.floor(i / this.WIDTH), 1, 1)
+	},
     setsize(w, h = w) {
       this.$refs.canvas.width = this.WIDTH = w
       this.$refs.canvas.height = this.HEIGHT = h
@@ -389,9 +378,8 @@ export default {
 		pixelView.setUint32(1, Math.floor(this.x) + Math.floor(this.y) * this.WIDTH)
 		// 将要填充的像素的颜色值写入DataView的第6个字节中。
 		pixelView.setUint8(5, this.PEN)
-		localStorage.placed = (localStorage.placed >>> 0) + 1
-    //Q:怎么把这个数据发送到服务器？
-    this.ws.send(pixelView)
+		localStorage.placed = (localStorage.placed >>> 0) + 1		
+		this.ws.send(pixelView)
     }
 	},
 	// 放置成功后的特效
