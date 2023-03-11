@@ -92,6 +92,7 @@ export default {
       legacy: true,
       send: null,
       call: null,
+      ws: null,
       arrowkeyDown:{
         left: false,
         right: false,
@@ -120,9 +121,8 @@ export default {
     this.generatePalette()
     this.send = WebSocket.prototype.send
     this.call = btoa.call.bind(btoa.call)
+    this.ws = new WebSocket('ws://localhost:9249')
     this.wscapsule()
-    console.log(this.send);
-    console.log(this.call);
   },
   beforeUnmount() {
     document.body.removeEventListener("touchstart", this.handleTouchStart)
@@ -137,31 +137,24 @@ export default {
   watch: {
 		
 	},
-  methods:{
-	// 三个函数作为参数：send、addEventListener和call。
-	// 这个函数是用来封装WebSocket的，将WebSocket的操作封装在一个“capsule（胶囊）”中，
-	// 从而实现对WebSocket实例的更加灵活的控制和管理。
-	// send函数用于向WebSocket服务器发送消息，
-	// addEventListener函数用于添加WebSocket事件监听器，
-	// call函数用于调用WebSocket实例的方法，比如关闭连接等。
-	// 使得WebSocket实例的使用更加方便和易于管理。	
+  methods:{	
 		wscapsule(){
-      let ws = new WebSocket('ws://localhost:9249')
-      ws.onmessage = async ({data}) => {
+		this.ws.onmessage = async ({data}) => {
         delete sessionStorage.err
         data = new DataView(await data.arrayBuffer())
         let code = data.getUint8(0)
+		console.log('code:',code);
         if (code == 1) {
           this.CD = data.getUint32(1) * 1000
           this.COOLDOWN = data.getUint32(5)
           if (data.byteLength == 17) {
-            this.width = data.getUint32(9)
-            this.height = data.getUint32(13)
-            this.setsize(this.width, this.height)
+            console.log('data.byteLength == 17');
+            this.WIDTH = data.getUint32(9)
+            this.HEIGHT = data.getUint32(13)
+            this.setsize(this.WIDTH, this.HEIGHT)
             if (this.load) {
               this.board = new Uint8Array(this.load)
               this.renderAll()
-              console.log('renderAll is called');
             }
           }
         } else if (code == 2) {
@@ -170,7 +163,12 @@ export default {
           } else {
             this.runLengthChanges(data, this.load)
           }
-        }
+        } else if (code == 6) {
+			let i = 0
+			while (i < data.byteLength - 2) {
+				
+			}
+		}
       }
     },
     runLengthChanges(data, a) {
@@ -193,6 +191,7 @@ export default {
       this.renderAll()
     },
     renderAll() {
+		console.log('renderAll start');
         let img = new ImageData(this.$refs.canvas.width, this.$refs.canvas.height)
         let data = new Uint32Array(img.data.buffer)
         for (let i = 0; i < this.board.length; i++) {
@@ -200,6 +199,7 @@ export default {
         }
         this.canvasCtx.putImageData(img, 0, 0)
         this.canvasCtx.getImageData(0, 0, 1, 1)
+		console.log('renderAll end');
     },
     setsize(w, h = w) {
       this.$refs.canvas.width = this.WIDTH = w
@@ -390,8 +390,9 @@ export default {
 		// 将要填充的像素的颜色值写入DataView的第6个字节中。
 		pixelView.setUint8(5, this.PEN)
 		localStorage.placed = (localStorage.placed >>> 0) + 1
-		// TODO: 通过WebSocket发送数据
-		}
+    //Q:怎么把这个数据发送到服务器？
+    this.ws.send(pixelView)
+    }
 	},
 	// 放置成功后的特效
 	confettiClick() {
@@ -491,13 +492,11 @@ export default {
           if (i <= 0) clearInterval(repeatFunc)
         },16)
     },
-		handleMouseDown(e) {
-      this.moved = 3
-      this.click = e.button + 1
-			console.log('mousedown');
+	handleMouseDown(e) {
+		this.moved = 3
+		this.click = e.button + 1
     },
     handleMouseUp(e) {
-			console.log('mouseup');
 			if (e.target != this.$refs.maincontent && !this.$refs.canvparent2.contains(e.target)) {
 				return (this.moved = 3, this.click = 0)
 			}
