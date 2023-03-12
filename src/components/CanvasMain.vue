@@ -19,6 +19,7 @@
 </template>
 <script>
 import confetti from 'canvas-confetti'
+import axios from 'axios'
 export default {
   data() {
     return {
@@ -119,6 +120,7 @@ export default {
     }
     this.setsize(this.WIDTH, this.HEIGHT)
     this.generatePalette()
+
     this.send = WebSocket.prototype.send
     this.call = btoa.call.bind(btoa.call)
     this.ws = new WebSocket('ws://127.0.0.1:9249')
@@ -138,18 +140,35 @@ export default {
 		
 	},
   methods:{	
-		wscapsule(){
+	fetchData() {
+		axios.get('http://localhost:3000/initPixel')
+			.then(response => {
+				this.board = response.data
+				console.log('board[0]:', this.board[0]);
+				this.renderAll()
+			})
+			.catch(error => {
+				console.log(error);
+			})
+	},
+	wscapsule(){
 		this.ws.onmessage = async ({data}) => {
         delete sessionStorage.err
         data = new DataView(await data.arrayBuffer())
         let code = data.getUint8(0)
-		console.log('code:',code);
+		console.log('code:', code);
         if (code == 1) {
-          console.log("code.length:",data.byteLength);
+			this.fetchData()
+			// this.renderAll()
         } else if (code == 2) {
-          console.log('2');
+			console.log('code:', code);
         } else if (code == 6) {
-			console.log('6');
+			// code = 6 代表服务器收到其他玩家的像素并广播
+			let i = 0 
+			while (i < data.byteLength -2 ) {
+				this.seti(data.getUint32(i+1), data.getUint8(i+5))
+				break
+			}
 		}
       }
     },
@@ -172,22 +191,40 @@ export default {
       }
       this.renderAll()
     },
+	runLengthDecodeBoard(data, length) {
+		data = new Uint8Array(data)
+		this.board = new Uint8Array(length)
+		let boardI = 0
+		let colour = 0
+		for (let i = 0; i < data.byteLength; i++) {
+			if (i % 2 == 0) {
+				colour = data[i]
+				continue
+			}
+			for (let j = 0; j < data[i]; j++) {
+				this.board[boardI++] = colour
+				boardI++
+			}
+		}
+		console.log('在runLengthDecodeBoard中的renderall');
+		this.renderAll()
+	},
     renderAll() {
-		console.log('renderAll start');
         let img = new ImageData(this.$refs.canvas.width, this.$refs.canvas.height)
         let data = new Uint32Array(img.data.buffer)
         for (let i = 0; i < this.board.length; i++) {
-          data[i] = this.palette[this.board[i]]
+          data[i] = this.PALETTE[this.board[i]]
         }
+		console.log('img:', img);
         this.canvasCtx.putImageData(img, 0, 0)
-        this.canvasCtx.getImageData(0, 0, 1, 1)
-		console.log('renderAll end');
+        // this.canvasCtx.getImageData(0, 0, 1, 1)
     },
 	seti(i, b) {
-		console.log(this.xa[0]);
+		this.xa = new Uint32Array(1)
+		this.xb = new Uint8Array(this.xa.buffer)
 		this.board[i] = b
 		this.xa[0] = this.PALETTE[b]
-		this.canvasCtx.fillStyle = "#" + (this.xb[0] < 16 ? "0": "") + this.xb[1].toString(16) + (this.xb[2] < 16 ? "0" : "") + this.xb[2].toString(16) + (this.xb[3] < 16 ? "0" : "") + this.xb[3].toString(16)
+		this.canvasCtx.fillStyle = "#" + (this.xb[0] < 16 ? "0" : "") + this.xb[0].toString(16) + (this.xb[1] < 16 ? "0" : "") + this.xb[1].toString(16) + (this.xb[2] < 16 ? "0" : "") + this.xb[2].toString(16) + (this.xb[3] < 16 ? "0" : "") + this.xb[3].toString(16)
 		this.canvasCtx.fillRect(i % this.WIDTH, Math.floor(i / this.WIDTH), 1, 1)
 	},
     setsize(w, h = w) {
@@ -355,7 +392,7 @@ export default {
     },
 	//这段代码定义了set函数，用于在指定位置绘制指定颜色的像素，
 	set(x, y, b) {
-		// 
+		//;
 		this.isFlashing = true
 		this.board[x % this.$refs.canvas.width + (y % this.$refs.canvas.height) * this.$refs.canvas.width] = b
 		this.xa[0] = this.PALETTE[b]
