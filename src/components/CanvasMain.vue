@@ -141,10 +141,9 @@ export default {
 	},
   methods:{	
 	fetchData() {
-		axios.get('http://localhost:3000/initPixel')
+		axios.get('http://localhost:3000/initPixel', { responseType: 'arraybuffer' } )
 			.then(response => {
-				this.board = response.data
-				console.log('board[0]:', this.board[0]);
+				this.board = new Uint8Array(response.data)
 				this.renderAll()
 			})
 			.catch(error => {
@@ -215,9 +214,8 @@ export default {
         for (let i = 0; i < this.board.length; i++) {
           data[i] = this.PALETTE[this.board[i]]
         }
-		console.log('img:', img);
         this.canvasCtx.putImageData(img, 0, 0)
-        // this.canvasCtx.getImageData(0, 0, 1, 1)
+        this.canvasCtx.getImageData(0, 0, 1, 1)
     },
 	seti(i, b) {
 		this.xa = new Uint32Array(1)
