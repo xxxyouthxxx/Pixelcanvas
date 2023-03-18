@@ -141,7 +141,7 @@ export default {
 	},
   methods:{	
 	fetchData() {
-		axios.get('http://localhost:3000/initPixel', { responseType: 'arraybuffer' } )
+		axios.get('http://localhost:3000/api', { responseType: 'arraybuffer' } )
 			.then(response => {
 				this.board = new Uint8Array(response.data)
 				this.renderAll()
