@@ -214,7 +214,10 @@ export default {
         for (let i = 0; i < this.board.length; i++) {
           data[i] = this.PALETTE[this.board[i]]
         }
-        this.canvasCtx.putImageData(img, 0, 0)
+		// console.log('data[0]', data[0].toString(2))
+        // console.log('data[1]', data[1].toString(2))
+		console.log('img', img)
+		this.canvasCtx.putImageData(img, 0, 0)
         this.canvasCtx.getImageData(0, 0, 1, 1)
     },
 	seti(i, b) {
